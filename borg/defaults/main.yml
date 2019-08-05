@@ -1,0 +1,74 @@
+---
+borg_compression: lz4
+
+borg_bin: /usr/bin/borg
+# https://borgbackup.readthedocs.io/en/stable/usage/init.html
+borg_encryption: none
+
+# https://borgbackup.readthedocs.io/en/stable/usage/general.html
+borg_remotes:
+  default:
+    path: 'ssh://example.org'
+    compression: "{{ borg_compression }}"
+    # Todo handle it
+    encryption: "{{ borg_encryption }}"
+
+
+borg_backups_example:
+  -
+    # requiredi
+
+    name: example
+    from:
+      - "-" # for stdin
+      - from_folder
+    # Percent sign must be escaped
+    dest: "{hostname}_postgres_{now:\\%Y-\\%m-\\%dT\\%H:\\%M:\\%S}"
+    #optional
+    stdin_name: postgresql_dump.sql
+    # By default - true
+    before_command: >- # Must be no line!
+      /usr/bin/flock -w 120 /var/tmp/postgres_dump_db.lock
+      docker-compose
+      -p lvh_cms
+      -f /root/config/docker/docker-compose.yml
+      exec -T db
+      pg_dumpall -U {{ lvh_cms_postgres_user }}
+
+    # defaults
+
+    remote: default
+    user: "{{ ansible_ssh_user }}"
+
+    # By default every hour
+    minute: "0"
+    hour: "*/1"
+
+    day: "*"
+    month: "*"
+    weekday: "*"
+
+    # TODO prune in cron
+    prune: true
+    prune_cron:
+      # By default every day
+      minute: "0"
+      hour: "0"
+      day: "*"
+      month: "*"
+      weekday: "*"
+    # https://borgbackup.readthedocs.io/en/stable/usage/prune.html
+    prune_prefix: null
+    prune_glob: null
+    keep_secondly: null
+    keep_minutely: null
+    keep_hourly: 24
+    keep_daily: 14
+    keep_weekly: 8
+    keep_monthly: -1
+
+
+    delete: true
+
+
+

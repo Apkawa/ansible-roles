@@ -1,0 +1,50 @@
+---
+
+- name: cron_prune vars
+  set_fact:
+    borg_prune_cron: >-
+      {% set borg_cron=[] -%}
+      {%- for backup in borg_backups -%}
+        {%- set args=[] -%}
+        {%- for k, v in backup.items() -%}
+          {%- if k.startswith('keep_') and v -%}
+            {% set _=args.append('--' + k.replace('_', '-') + '=' + str(v)) -%}
+          {%- endif -%}
+        {%- endfor -%}
+        {%- if backup.get('prune_glob') -%}
+            {% set _=args.append('--glob-archives=' + backup.prune_glob) -%}
+        {%- endif %}
+        {%- if backup.get('prune_prefix') -%}
+            {% set _=args.append('--prefix=' + backup.prune_prefix) -%}
+        {%- endif -%}
+        {%- set remote=borg_remotes[backup.get('remote', 'default')] -%}
+        {%- set command=("{borg_bin} prune {args} {remote}").format(
+            borg_bin=borg_bin,
+            remote=remote.path,
+            args=' '.join(args)
+            ) -%}
+        {% set prune_cron=backup.prune_cron|default({'hour': '0', 'minute': '0'}) -%}
+        {% set cron_entry=prune_cron|combine(
+              {
+              'name': 'borg__prune__' + backup.name,
+              'command': command,
+              'delete': not backup.get('prune')
+              }
+        ) -%}
+        {% set _ignored=borg_cron.append(cron_entry) -%}
+      {%- endfor -%}
+      {{ borg_cron }}
+
+  when: borg_backups is defined and borg_backups
+
+
+#- debug: var=borg_prune_cron
+#- debug:
+#    msg: "{{ item }}"
+#  with_items: "{{ borg_prune_cron }}"
+
+- name: Install backup cleanup cron
+  include_role:
+    name: apkawa.cron
+  vars:
+    cron: "{{ borg_prune_cron }}"

@@ -1,0 +1,46 @@
+---
+
+- name: cron vars
+  set_fact:
+    borg_cron: |
+      {% set borg_cron=[] -%}
+      {% for backup in borg_backups -%}
+        {% set remote=borg_remotes[backup.get('remote', 'default')] -%}
+        {% set before_command="" -%}
+        {%- if backup.get('before_command') -%}
+        {% set before_command="out=$({command}) && echo $out | ".format(command=backup['before_command']) -%}
+        {%- endif -%}
+        {% set command=("{{ {before_command} {borg_bin} create --compression={compression} '{remote}::{dest}' {from} "
+            + "--stdin-name={stdin_name}; }} 2>&1 >>/var/log/{name}.log").format(
+            before_command=before_command,
+            borg_bin=borg_bin,
+            remote=remote.path,
+            dest=backup.dest,
+            from=backup.from|join(' '),
+            compression=remote.get('compresison', borg_compression),
+            stdin_name=backup.get('stdin_name', 'stdout'),
+            ) -%}
+        {% set cron_entry=backup|combine(
+              {
+              'command': command,
+              'name': "borg__" + backup.name,
+              }
+        ) -%}
+        {% set _ignored=borg_cron.append(cron_entry) -%}
+      {%- endfor %}
+      {{ borg_cron }}
+
+  when: borg_backups is defined and borg_backups
+
+
+#- debug: var=borg_backups
+#- debug: var=borg_cron
+- debug:
+    msg: "{{ item }}"
+  with_items: "{{ borg_cron }}"
+
+- name: Install backup cron
+  include_role:
+    name: apkawa.cron
+  vars:
+    cron: "{{ borg_cron }}"

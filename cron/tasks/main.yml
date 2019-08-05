@@ -1,0 +1,65 @@
+---
+
+- include_vars: "{{ ansible_distribution }}.yml"
+
+- name: Install cron
+  package:
+    name: "{{cron_package}}"
+
+- name: Add a variable to a file under /etc/cron.d
+  sudo: True
+  cronvar:
+    name: SHELL
+    value: /bin/bash
+    user: "{{ item.user|default(ansible_ssh_user) }}"
+    state: present
+
+  with_items: [ "{{ cron }}" ]
+  when: (
+    item.delete is undefined
+    or (item.delete is defined and not item.delete)
+    )
+
+
+- name: "Remove cron"
+  sudo: True
+  cron:
+    job: "{{ item.command }}"
+    name: "{{ item.name }}"
+
+    minute: "{{ item.minute|default('*') }}"
+    hour: "{{ item.hour|default('*') }}"
+    day: "{{ item.day|default('*') }}"
+    month: "{{ item.month|default('*') }}"
+    weekday: "{{ item.weekday|default('*') }}"
+    user: "{{ item.user|default(ansible_ssh_user) }}"
+    state: absent
+
+  when: item.delete is defined and item.delete
+  with_items: [ "{{ cron }}" ]
+
+- name: "Add cron"
+  sudo: True
+  cron:
+    job: "{{ item.command }}"
+    name: "{{ item.name }}"
+
+    minute: "{{ item.minute|default('*') }}"
+    hour: "{{ item.hour|default('*') }}"
+    day: "{{ item.day|default('*') }}"
+    month: "{{ item.month|default('*') }}"
+    weekday: "{{ item.weekday|default('*') }}"
+    user: "{{ item.user|default(ansible_ssh_user) }}"
+
+    state: present
+
+  with_items: [ "{{ cron }}" ]
+  when: (
+        item.delete is undefined
+        or (item.delete is defined and not item.delete)
+          )
+
+- name: Start daemon
+  service:
+    name: "{{ cron_daemon }}"
+    state: started

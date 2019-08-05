@@ -1,0 +1,23 @@
+---
+
+
+- name: Install borg
+  package:
+    name: borgbackup
+
+
+- name: Initialize remote
+  # TODO encryption
+  shell: >
+    {{ borg_bin }} info {{ item.value.path }} ||
+    {{ borg_bin }} init
+    --encryption={{ item.value.encryption|default(borg_encryption) }}
+    --make-parent-dirs {{ item.value.path }}
+  with_dict: "{{ borg_remotes }}"
+
+
+
+- include: cron.yml
+- include: prune.yml
+
+
